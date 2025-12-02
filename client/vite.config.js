@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://humbas_backend.onrender.com', 
+        target: 'https://humbas-backend-o7jf.onrender.com', 
       },
     },
   },
