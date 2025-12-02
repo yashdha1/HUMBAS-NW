@@ -12,11 +12,16 @@ import { protectedRoute, adminRoute } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-// Route should be protected and only be accesible via ADMIN...
-router.get("/", protectedRoute, adminRoute, getProducts); 
+// Public routes
 router.get("/category/:category", getProductsByCategory); // for everyone on the homepage of the website:-> 
+router.get("/recommended", getRecommendedProducts); // Get recommended products (public)
+router.get("/featured", getfeaturedProducts); // Get featured products (public)
+
+// Protected admin routes
+router.get("/", protectedRoute, adminRoute, getProducts); 
 router.post("/", protectedRoute, adminRoute, createProduct);
 router.delete("/:_id", protectedRoute, adminRoute, deleteProduct);
+router.put("/:_id/featured", protectedRoute, adminRoute, toggleFeaturedProduct);
 
 
 export default router;

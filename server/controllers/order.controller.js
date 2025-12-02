@@ -15,35 +15,71 @@ export const getAllOrders = async (req, res) => {
         model: Product,
         select: "name price",
       });
-    console.log("Fetched all orders successfully", orders);
-    res.json(orders);
+    res.json({ success: true, orders });
   } catch (error) {
-    console.log("Error in getAllOrders controller", error.message);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Error in getAllOrders controller:", error.message);
+    res.status(500).json({ success: false, message: "Server error", error: process.env.NODE_ENV === "development" ? error.message : undefined });
   }
 };
 
 export const updateOrderStatus = async (req, res) => {
   try {
-    // get the status from the frontend :-> 
+    // Only admins can update order status (except users can cancel their own orders)
     const { orderId, status } = req.body;
     if (!orderId || !status) {
-      return res.status(400).json({ message: "Order ID and status are required" });
+      return res.status(400).json({ 
+        success: false,
+        message: "Order ID and status are required" 
+      });
     }
 
     const order = await Order.findById(orderId);
     if (!order) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({ 
+        success: false,
+        message: "Order not found" 
+      });
+    }
+
+    // Users can only cancel their own orders
+    if (status === "cancelled" && req.user.role === "user") {
+      if (order.userId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ 
+          success: false,
+          message: "You can only cancel your own orders" 
+        });
+      }
+    } else if (req.user.role !== "admin") {
+      // Only admins can set other statuses
+      return res.status(403).json({ 
+        success: false,
+        message: "Admin access required to update order status" 
+      });
+    }
+
+    // Validate status values
+    const validStatuses = ["pending", "processing", "shipped", "delivered", "cancelled"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ 
+        success: false,
+        message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` 
+      });
     }
 
     order.status = status;
     await order.save();
 
-    console.log("Order status updated successfully", order);
-    res.json(order);
+    res.json({ 
+      success: true,
+      order 
+    });
   } catch (error) {
-    console.log("Error in updateOrderStatus controller", error.message);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Error in updateOrderStatus controller:", error.message);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error", 
+      error: process.env.NODE_ENV === "development" ? error.message : undefined 
+    });
   }
 };
 
@@ -51,7 +87,13 @@ export const getOrdersByStatus  = async (req, res) => {
     try {
         const { status } = req.query;
         if (!status) {
-             return res.status(400).json({ message: "Status is required" });
+             return res.status(400).json({ success: false, message: "Status is required" });
+        }
+        
+        // Validate status
+        const validStatuses = ["pending", "processing", "shipped", "delivered", "cancelled"];
+        if (!validStatuses.includes(status.toLowerCase())) {
+            return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
         }
         const orders = await Order.find({ status })
           .populate({
@@ -65,11 +107,10 @@ export const getOrdersByStatus  = async (req, res) => {
             select: "name price image",
           })
           .sort({ createdAt: -1 });
-        console.log("Fetched orders by status successfully", orders);
-        res.json(orders);
+        res.json({ success: true, orders });
     } catch (error) {
-        console.log("Error in getOrdersByStatus controller", error.message);
-        res.status(500).json({ message: "Server error", error: error.message });
+        console.error("Error in getOrdersByStatus controller:", error.message);
+        res.status(500).json({ success: false, message: "Server error", error: process.env.NODE_ENV === "development" ? error.message : undefined });
     }
 };
 
@@ -91,11 +132,10 @@ export const getUserOrders = async (req, res) => {
       })
       .sort({ createdAt: -1 });
     
-    console.log("Fetched user orders successfully", orders);
-    res.json(orders);
+    res.json({ success: true, orders });
   } catch (error) {
-    console.log("Error in getUserOrders controller", error.message);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Error in getUserOrders controller:", error.message);
+    res.status(500).json({ success: false, message: "Server error", error: process.env.NODE_ENV === "development" ? error.message : undefined });
   }
 };
 

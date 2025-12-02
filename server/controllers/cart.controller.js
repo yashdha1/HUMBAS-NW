@@ -30,17 +30,28 @@ export const getAllProducts = async (req, res) => {
       .filter((item) => !!item);
 
     // 4. Respond with the merged data
-    return res.json(cartDetails);
+    return res.json({ success: true, cart: cartDetails });
   } catch (error) {
-    console.log("Error in getAllProducts controller", error.message);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Error in getAllProducts controller:", error.message);
+    res.status(500).json({ success: false, message: "Server error", error: process.env.NODE_ENV === "development" ? error.message : undefined });
   }
 };
 
 export const addToCart = async (req, res) => {
   try {
     const { productId } = req.body;
+    
+    if (!productId) {
+      return res.status(400).json({ success: false, message: "Product ID is required" });
+    }
+
     const user = req.user;
+    
+    // Verify product exists
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found" });
+    }
 
     const existingItem = user.cartItems.find(
       (item) => item.product && item.product.toString() === productId
@@ -55,16 +66,17 @@ export const addToCart = async (req, res) => {
     }
 
     await user.save();
-    res.json(user.cartItems);
+    res.json({ success: true, cartItems: user.cartItems });
   } catch (error) {
-    console.log("Error in addToCart controller", error.message);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Error in addToCart controller:", error.message);
+    res.status(500).json({ success: false, message: "Server error", error: process.env.NODE_ENV === "development" ? error.message : undefined });
   }
 };
 export const removeAllFromCart = async (req, res) => {
   try {
     const { productId } = req.body;
     const user = req.user;
+    
     if (!productId) {
       user.cartItems = [];
     } else {
@@ -74,10 +86,10 @@ export const removeAllFromCart = async (req, res) => {
     }
 
     await user.save(); // save the user back to DB:
-    res.json(user.cartItems);
+    res.json({ success: true, cartItems: user.cartItems });
   } catch (error) {
-    console.log("Error in removeAllFromCart CONTROLLER. ");
-    res.status(500).json({ error: error.message });
+    console.error("Error in removeAllFromCart CONTROLLER:", error.message);
+    res.status(500).json({ success: false, error: process.env.NODE_ENV === "development" ? error.message : "Internal server error" });
   }
 };
 
@@ -125,9 +137,6 @@ export const updateQuantity = async (req, res) => {
     }
 
     const user = req.user;
-    console.log("Update quantity - User cartItems:", user.cartItems);
-    console.log("Update quantity - Looking for productId:", productId);
-
     // Use .find() to locate the item in the array by its product ID
     const existingItem = user.cartItems.find(
       (item) => {
@@ -135,8 +144,6 @@ export const updateQuantity = async (req, res) => {
         return itemProductId === productId.toString();
       }
     );
-
-    console.log("Update quantity - Existing item found:", existingItem);
 
     if (existingItem) {
       if (quantity === 0) {
@@ -193,20 +200,19 @@ export const updateQuantity = async (req, res) => {
           };
         })
         .filter((item) => !!item);
-      return res.json(cartDetails);
+      return res.json({ success: true, cart: cartDetails });
     } else {
-      console.log("Product not found in cart. ProductId:", productId, "CartItems:", user.cartItems);
       return res.status(404).json({ 
-        message: "Product not found in cart. Please refresh and try again.",
-        productId: productId 
+        success: false,
+        message: "Product not found in cart. Please refresh and try again."
       });
     }
   } catch (error) {
     console.error("Error in updateQuantity controller:", error.message);
-    console.error("Error stack:", error.stack);
     res.status(500).json({ 
+      success: false,
       message: "Server error while updating quantity", 
-      error: error.message 
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
     });
   }
 };
@@ -219,11 +225,8 @@ export const createOrder = async (req, res) => {
     const user = req.user;
     
     if (!user.cartItems || user.cartItems.length === 0) {
-      return res.status(400).json({ message: "Cart is empty" });
+      return res.status(400).json({ success: false, message: "Cart is empty" });
     }
-
-    console.log("Creating order for user:", user._id);
-    console.log("Cart items:", user.cartItems);
 
     // Calculate total amount
     const productIds = user.cartItems
@@ -236,15 +239,13 @@ export const createOrder = async (req, res) => {
       .filter((id) => id != null);
     
     if (productIds.length === 0) {
-      return res.status(400).json({ message: "No valid products found in cart" });
+      return res.status(400).json({ success: false, message: "No valid products found in cart" });
     }
 
-    console.log("Fetching products with IDs:", productIds);
     const products = await Product.find({ _id: { $in: productIds } });
-    console.log("Found products:", products.length);
 
     if (products.length === 0) {
-      return res.status(400).json({ message: "Products not found in database. Please refresh your cart." });
+      return res.status(400).json({ success: false, message: "Products not found in database. Please refresh your cart." });
     }
     
     let totalAmount = 0;
@@ -259,7 +260,6 @@ export const createOrder = async (req, res) => {
       );
       
       if (!product) {
-        console.warn("Product not found for cart item:", productId);
         continue;
       }
       
@@ -275,22 +275,17 @@ export const createOrder = async (req, res) => {
     }
 
     if (orderProducts.length === 0) {
-      return res.status(400).json({ message: "No valid products found to create order" });
+      return res.status(400).json({ success: false, message: "No valid products found to create order" });
     }
-
-    console.log("Creating order with products:", orderProducts.length, "Total:", totalAmount);
 
     const order = await Order.create({
       userId: user._id,
       products: orderProducts,
-      status: "Pending",
+      status: "pending", // lowercase to match model enum
       totalAmount: totalAmount,
     });
     
-    console.log("Order created:", order._id);
-    
     await emptyCart(user);
-    console.log("Cart emptied");
     
     if (!user.orders) {
       user.orders = [];
@@ -298,7 +293,6 @@ export const createOrder = async (req, res) => {
     user.orders.push({ orderId: order._id.toString() });
     
     await user.save();
-    console.log("User saved with new order");
     
     // Populate the order before returning
     const populatedOrder = await Order.findById(order._id)
@@ -308,13 +302,13 @@ export const createOrder = async (req, res) => {
         select: "name price image",
       });
     
-    return res.status(201).json(populatedOrder || order);
+    return res.status(201).json({ success: true, order: populatedOrder || order });
   } catch (error) {
     console.error("Error in createOrder controller:", error.message);
-    console.error("Error stack:", error.stack);
     res.status(500).json({ 
+      success: false,
       message: "Server error while creating order", 
-      error: error.message 
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
     });
   }
 };

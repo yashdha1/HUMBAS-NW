@@ -33,8 +33,8 @@ const orderSchema = new mongoose.Schema(
     status : {
       // status of the order : 
       type: String,
-      enum: ["Pending", "Shipped", "Delivered", "Cancelled"],
-      default: "Pending",
+      enum: ["pending", "processing", "shipped", "delivered", "cancelled"],
+      default: "pending",
       index: true, // enables efficient filtering by status
     },
     // summa of the total order eill be stored here :
