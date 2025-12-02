@@ -3,6 +3,8 @@ import Order from "../model/order.model.js";
 import jwt from "jsonwebtoken";
 import { redis } from "../lib/redis.js";
 
+const isProduction = process.env.NODE_ENV === "production"; 
+
 // Endpoints :
 export const signup = async (req, res) => {
   try {
@@ -150,8 +152,7 @@ export const refreshTokens = async (req, res) => {
       process.env.JWT_ACCESS_SECRET,
       { expiresIn: process.env.JWT_ACCESS_EXPIREIN }
     );
-    // Set the new access token in cookies
-    const isProduction = process.env.NODE_ENV === "production";
+    
     res.cookie("accessToken", refreshedAccessToken, {
       httpOnly: true,
       secure: isProduction,
@@ -318,22 +319,18 @@ const storeTokens = async (userId, refreshToken) => {
   );
 };
 const setCookies = (res, accessToken, refreshToken) => {
-  const isProduction = process.env.NODE_ENV === "production";
-  
-  res.cookie("accessToken", accessToken, {
+  res.cookie("accessToken", refreshedAccessToken, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? "none" : "lax", // "none" for cross-origin in production
+    sameSite: isProduction ? "none" : "lax",
     maxAge: 15 * 60 * 1000,
     ...(isProduction && { domain: process.env.COOKIE_DOMAIN }),
   });
 
-  const isProduction = process.env.NODE_ENV === "production";
-  
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? "none" : "lax", // "none" for cross-origin in production
+    sameSite: isProduction ? "none" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000,
     ...(isProduction && { domain: process.env.COOKIE_DOMAIN }),
   });
