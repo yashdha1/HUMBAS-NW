@@ -7,11 +7,11 @@ const getBaseURL = () => {
   }
   return import.meta.env.MODE === "development"
     ? "http://localhost:5000/api/v1"
-    : "/api/v1"; // Use relative path in production when served from same domain
+    : "https://humbas_backend.onrender.com/api/v1"; // Use relative path in production when served from same domain
 };
 
 const axiosInstance = axios.create({
-  baseURL: getBaseURL(),
+  baseURL: "https://humbas_backend.onrender.com/api/v1",
   withCredentials: true, // cookies will be sent for everything
   timeout: 30000, // 30 second timeout
   headers: {
